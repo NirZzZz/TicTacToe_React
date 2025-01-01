@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState } from "react";
+import axios from "axios";
 
 function Square({ value, onSquareClick, isWinningSquare }) {
   return (
@@ -11,7 +12,7 @@ function Square({ value, onSquareClick, isWinningSquare }) {
   );
 }
 
-function Board({ xIsNext, squares, onPlay, move }) {
+function Board({ xIsNext, squares, onPlay, move, playerX, playerO, handleEndGame }) {
   const winnerInfo = calculateWinner(squares);
   const winner = winnerInfo ? winnerInfo.winner : null;
   const winningSquares = winnerInfo ? winnerInfo.line : [];
@@ -19,6 +20,8 @@ function Board({ xIsNext, squares, onPlay, move }) {
   let status;
   if (winner) {
     status = "Winner: " + winner;
+    // Call handleEndGame when game is finished
+    handleEndGame(winner);
   } else if (squares.every(Boolean)) {
     status = "It's a draw!";
   } else {
@@ -68,6 +71,10 @@ export default function Game() {
   const [history, setHistory] = useState([Array(9).fill(null)]);
   const [currentMove, setCurrentMove] = useState(0);
   const [sortOrder, setSortOrder] = useState("asc");
+  const [playerX, setPlayerX] = useState("");
+  const [playerO, setPlayerO] = useState("");
+  const [gameStarted, setGameStarted] = useState(false);
+
   const xIsNext = currentMove % 2 === 0;
   const currentSquares = history[currentMove];
 
@@ -98,6 +105,60 @@ export default function Game() {
     );
   });
 
+  const handleStartGame = () => {
+    if (playerX && playerO) {
+      setGameStarted(true);
+      axios.post("http://localhost:5000/start_game", {
+        player_x: playerX,
+        player_o: playerO,
+      })
+      .catch(error => {
+        console.error("Error starting the game:", error);
+      });
+    } else {
+      alert("Please enter both players' names!");
+    }
+  };
+
+  // Updated handleEndGame to send winner and loser to backend
+  const handleEndGame = (winner) => {
+    if (winner) {
+      const winnerName = winner === "X" ? playerX : playerO;
+      const loserName = winner === "X" ? playerO : playerX;
+      axios.post("http://localhost:5000/start_game", {
+        player_x: playerX,
+        player_o: playerO,
+        winner: winnerName,
+        loser: loserName,
+      })
+      .catch(error => {
+        console.error("Error updating scores:", error);
+      });
+    }
+  };
+
+  if (!gameStarted) {
+    return (
+      <div>
+        <h2>Who's gonna play the X today?</h2>
+        <input
+          type="text"
+          value={playerX}
+          onChange={(e) => setPlayerX(e.target.value)}
+          placeholder="Enter X player name"
+        />
+        <h2>And for the O, what's your name buddy?</h2>
+        <input
+          type="text"
+          value={playerO}
+          onChange={(e) => setPlayerO(e.target.value)}
+          placeholder="Enter O player name"
+        />
+        <button onClick={handleStartGame}>Start Game</button>
+      </div>
+    );
+  }
+
   return (
     <div className="game">
       <div className="game-board">
@@ -106,6 +167,9 @@ export default function Game() {
           squares={currentSquares}
           onPlay={handlePlay}
           move={currentMove}
+          playerX={playerX}   // Passing playerX as a prop to Board
+          playerO={playerO}   // Passing playerO as a prop to Board
+          handleEndGame={handleEndGame}  // Passing handleEndGame function to Board
         />
       </div>
       <div className="game-info">
